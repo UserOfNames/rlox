@@ -12,7 +12,7 @@ pub type LineNum = u32;
 pub struct Chunk {
     code: Vec<OpCode>,
     constants: Vec<Value>,
-    lines: Vec<LineNum>,
+    lines: Vec<(LineNum, u16)>, // RLE, u16 is repetitions
 }
 
 impl Chunk {
@@ -40,11 +40,25 @@ impl Chunk {
     }
 
     pub fn push_line(&mut self, line: LineNum) {
-        self.lines.push(line);
+        if let Some(last) = self.lines.last_mut() && last.0 == line {
+            last.1 += 1;
+        } else {
+            self.lines.push((line, 1));
+        }
     }
 
-    pub fn get_line(&self, i: usize) -> Option<LineNum> {
-        self.lines.get(i).copied()
+    pub fn get_line(&self, mut i: usize) -> Option<LineNum> {
+        for (line, count) in self.lines.iter().copied() {
+            let count = count as usize;
+
+            if i < count {
+                return Some(line);
+            }
+
+            i -= count;
+        }
+
+        None
     }
 }
 
