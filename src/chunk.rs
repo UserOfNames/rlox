@@ -40,11 +40,14 @@ impl Chunk {
     }
 
     pub fn push_line(&mut self, line: LineNum) {
-        if let Some(last) = self.lines.last_mut() && last.0 == line {
+        if let Some(last) = self.lines.last_mut()
+            && last.0 == line
+        {
             last.1 += 1;
-        } else {
-            self.lines.push((line, 1));
+            return;
         }
+
+        self.lines.push((line, 1));
     }
 
     pub fn get_line(&self, mut i: usize) -> Option<LineNum> {
@@ -65,11 +68,11 @@ impl Chunk {
 impl std::fmt::Display for Chunk {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for (i, opcode) in self.code.iter().enumerate() {
-            #[rustfmt::skip]
-            writeln!(f, "{:04} {:4} {}", i, self.get_line(i).unwrap(), match opcode {
-                OpCode::Constant(c) => format!("Constant {c}: {}", self.constants[*c]),
-                OpCode::Return => "Return".to_string(),
-            })?;
+            write!(f, "{:04} {:4} ", i, self.get_line(i).unwrap())?;
+            match opcode {
+                OpCode::Constant(c) => writeln!(f, "Constant {c}: {}", self.constants[*c])?,
+                OpCode::Return => writeln!(f, "Return")?,
+            }
         }
 
         Ok(())
