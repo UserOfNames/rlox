@@ -24,10 +24,16 @@ fn run_file(p: PathBuf) -> InterpretResult<()> {
 fn main() -> InterpretResult<()> {
     let args = Args::parse();
 
-    match args.path {
-        Some(p) => run_file(p)?,
-        None => repl(),
-    }
+    // match args.path {
+    //     Some(p) => run_file(p)?,
+    //     None => repl(),
+    // }
+
+    use chunk::{Chunk, Value, LineNum, OpCode};
+    let mut c = Chunk::new();
+    c.push_const_opcode(4.2, 1);
+    c.push_opcode(OpCode::Return, 2);
+    println!("{c}");
 
     Ok(())
 }
