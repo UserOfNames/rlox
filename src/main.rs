@@ -1,12 +1,10 @@
 mod chunk;
 mod vm;
 
-use std::fmt;
 use std::path::PathBuf;
 
 use clap::Parser;
 
-use chunk::LineNum;
 use vm::VM;
 
 #[derive(Debug, Parser)]
@@ -36,7 +34,7 @@ fn run_file(p: PathBuf) -> InterpretResult {
 fn main() -> InterpretResult {
     let args = Args::parse();
 
-    let vm = VM::new();
+    let mut vm = VM::new();
 
     // match args.path {
     //     Some(p) => run_file(p)?,
@@ -47,7 +45,7 @@ fn main() -> InterpretResult {
     let mut c = Chunk::new();
     c.push_const_opcode(4.2, 1);
     c.push_opcode(OpCode::Return, 2);
-    println!("{c}");
+    vm.interpret(c).unwrap();
 
     Ok(())
 }

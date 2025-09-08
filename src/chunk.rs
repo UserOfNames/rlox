@@ -1,3 +1,5 @@
+use std::fmt::Write;
+
 pub type Value = f64;
 
 #[derive(Debug)]
@@ -10,8 +12,8 @@ pub type LineNum = u32;
 
 #[derive(Debug)]
 pub struct Chunk {
-    code: Vec<OpCode>,
-    constants: Vec<Value>,
+    pub code: Vec<OpCode>,
+    pub constants: Vec<Value>,
     lines: Vec<(LineNum, u16)>, // RLE, u16 is repetitions
 }
 
@@ -63,16 +65,32 @@ impl Chunk {
 
         None
     }
+
+    pub fn disassemble_instruction(&self, i: usize) -> Option<String> {
+        let line = self.get_line(i)?;
+
+        let mut res = String::new();
+
+        // `write!`ing into a String is infallible
+        write!(res, "{:04} {:4} ", i, line).unwrap();
+
+        match self.code.get(i)? {
+            OpCode::Constant(const_i) => {
+                let constant = self.constants[*const_i];
+                writeln!(res, "Constant {const_i}: {}", constant).unwrap();
+            }
+
+            OpCode::Return => writeln!(res, "Return").unwrap(),
+        };
+
+        Some(res)
+    }
 }
 
 impl std::fmt::Display for Chunk {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for (i, opcode) in self.code.iter().enumerate() {
-            write!(f, "{:04} {:4} ", i, self.get_line(i).unwrap())?;
-            match opcode {
-                OpCode::Constant(c) => writeln!(f, "Constant {c}: {}", self.constants[*c])?,
-                OpCode::Return => writeln!(f, "Return")?,
-            }
+        for i in 0..self.code.len() {
+            write!(f, "{}", self.disassemble_instruction(i).unwrap())?;
         }
 
         Ok(())
