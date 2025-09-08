@@ -46,10 +46,9 @@ impl Chunk {
             && last.0 == line
         {
             last.1 += 1;
-            return;
+        } else {
+            self.lines.push((line, 1));
         }
-
-        self.lines.push((line, 1));
     }
 
     pub fn get_line(&self, mut i: usize) -> Option<LineNum> {
@@ -76,7 +75,7 @@ impl Chunk {
 
         match self.code.get(i)? {
             OpCode::Constant(const_i) => {
-                let constant = self.constants[*const_i];
+                let constant = self.constants.get(i)?;
                 writeln!(res, "Constant {const_i}: {}", constant).unwrap();
             }
 
@@ -90,7 +89,8 @@ impl Chunk {
 impl std::fmt::Display for Chunk {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for i in 0..self.code.len() {
-            write!(f, "{}", self.disassemble_instruction(i).unwrap())?;
+            let formatted_instruction = self.disassemble_instruction(i).unwrap();
+            write!(f, "{}", formatted_instruction)?;
         }
 
         Ok(())
