@@ -43,7 +43,12 @@ fn main() -> InterpretResult {
 
     use chunk::{Chunk, LineNum, OpCode, Value};
     let mut c = Chunk::new();
-    c.push_const_opcode(4.2, 1);
+    c.push_const_opcode(1.2, 1);
+    c.push_const_opcode(3.4, 1);
+    c.push_opcode(OpCode::Add, 1);
+    c.push_const_opcode(5.6, 1);
+    c.push_opcode(OpCode::Negate, 1);
+    c.push_opcode(OpCode::Div, 1);
     c.push_opcode(OpCode::Return, 2);
     vm.interpret(c).unwrap();
 

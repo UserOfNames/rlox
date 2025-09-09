@@ -5,6 +5,11 @@ pub type Value = f64;
 #[derive(Debug)]
 pub enum OpCode {
     Constant(usize),
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Negate,
     Return,
 }
 
@@ -78,6 +83,12 @@ impl Chunk {
                 let constant = self.constants.get(i)?;
                 writeln!(res, "Constant {const_i}: {}", constant).unwrap();
             }
+
+            OpCode::Negate => writeln!(res, "Negate").unwrap(),
+            OpCode::Add => writeln!(res, "Add").unwrap(),
+            OpCode::Sub => writeln!(res, "Sub").unwrap(),
+            OpCode::Mul => writeln!(res, "Mul").unwrap(),
+            OpCode::Div => writeln!(res, "Div").unwrap(),
 
             OpCode::Return => writeln!(res, "Return").unwrap(),
         };
