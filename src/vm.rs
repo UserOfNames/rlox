@@ -16,9 +16,8 @@ impl VM {
         }
     }
 
-    pub fn interpret(&mut self, chunk: Chunk) -> InterpretResult {
-        self.chunk = chunk;
-        self.run()
+    pub fn interpret<T>(&mut self, source: T) -> InterpretResult {
+        todo!();
     }
 
     fn run(&mut self) -> InterpretResult {
@@ -33,7 +32,7 @@ impl VM {
                 .chunk
                 .code
                 .get(self.ip)
-                .ok_or(InterpretError::RuntimeError)?;
+                .ok_or(InterpretError::Runtime)?;
             self.ip += 1;
 
             match instruction {
@@ -43,7 +42,7 @@ impl VM {
                         .chunk
                         .constants
                         .get(*c)
-                        .ok_or(InterpretError::RuntimeError)?;
+                        .ok_or(InterpretError::Runtime)?;
                     self.stack.push(constant);
                 }
 

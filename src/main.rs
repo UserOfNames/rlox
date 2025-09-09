@@ -1,6 +1,9 @@
 mod chunk;
+mod compiler; // TODO: Move?
 mod vm;
 
+use std::fs::File;
+use std::io::{self, stdin, stdout, BufRead, BufReader, Write};
 use std::path::PathBuf;
 
 use clap::Parser;
@@ -17,40 +20,59 @@ struct Args {
 // TODO: impl Error
 #[derive(Debug)]
 enum InterpretError {
-    CompilerError,
-    RuntimeError,
+    Compiler,
+    Runtime,
+    Io(io::Error),
+}
+
+impl From<io::Error> for InterpretError {
+    fn from(value: io::Error) -> Self {
+        Self::Io(value)
+    }
 }
 
 type InterpretResult = Result<(), InterpretError>;
 
 fn repl() {
-    todo!();
+    let mut vm = VM::new();
+
+    let mut input = String::new();
+    let mut stdin = stdin().lock();
+
+    loop {
+        print!(":> ");
+        stdout().flush().expect("Could not flush stdout");
+        input.clear();
+
+        let read_result = stdin.read_line(&mut input);
+        if let Err(e) = read_result {
+            eprintln!("Error reading input: {e}");
+            continue;
+        }
+
+        let interpret_result = vm.interpret(std::mem::take(&mut input));
+        if let Err(e) = interpret_result {
+            // TODO: Debug -> Display
+            eprintln!("Error interpreting input: {e:?}");
+        }
+    }
 }
 
 fn run_file(p: PathBuf) -> InterpretResult {
-    todo!();
+    let mut vm = VM::new();
+
+    let file = File::open(p)?;
+    let source = BufReader::new(file).lines();
+    vm.interpret(source)
 }
 
 fn main() -> InterpretResult {
     let args = Args::parse();
 
-    let mut vm = VM::new();
-
-    // match args.path {
-    //     Some(p) => run_file(p)?,
-    //     None => repl(),
-    // }
-
-    use chunk::{Chunk, LineNum, OpCode, Value};
-    let mut c = Chunk::new();
-    c.push_const_opcode(1.2, 1);
-    c.push_const_opcode(3.4, 1);
-    c.push_opcode(OpCode::Add, 1);
-    c.push_const_opcode(5.6, 1);
-    c.push_opcode(OpCode::Negate, 1);
-    c.push_opcode(OpCode::Div, 1);
-    c.push_opcode(OpCode::Return, 2);
-    vm.interpret(c).unwrap();
+    match args.path {
+        Some(p) => run_file(p)?,
+        None => repl(),
+    }
 
     Ok(())
 }
