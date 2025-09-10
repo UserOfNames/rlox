@@ -1,4 +1,5 @@
 use crate::chunk::{Chunk, OpCode, Value};
+use crate::compiler::compile;
 use crate::{InterpretError, InterpretResult};
 
 pub struct VM {
@@ -16,11 +17,12 @@ impl VM {
         }
     }
 
-    pub fn interpret<T>(&mut self, source: T) -> InterpretResult {
-        todo!();
+    pub fn interpret(&mut self, source: &str) -> InterpretResult<()> {
+        compile(source)?;
+        Ok(())
     }
 
-    fn run(&mut self) -> InterpretResult {
+    fn run(&mut self) -> InterpretResult<()> {
         loop {
             #[cfg(feature = "debug_trace_execution")]
             {

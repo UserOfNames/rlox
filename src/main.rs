@@ -2,8 +2,8 @@ mod chunk;
 mod compiler; // TODO: Move?
 mod vm;
 
-use std::fs::File;
-use std::io::{self, stdin, stdout, BufRead, BufReader, Write};
+use std::fs::{read_to_string};
+use std::io::{self, BufRead, Write, stdin, stdout};
 use std::path::PathBuf;
 
 use clap::Parser;
@@ -19,10 +19,11 @@ struct Args {
 
 // TODO: impl Error
 #[derive(Debug)]
-enum InterpretError {
+pub enum InterpretError {
     Compiler,
     Runtime,
     Io(io::Error),
+    NumParse(std::num::ParseFloatError),
 }
 
 impl From<io::Error> for InterpretError {
@@ -31,7 +32,13 @@ impl From<io::Error> for InterpretError {
     }
 }
 
-type InterpretResult = Result<(), InterpretError>;
+impl From<std::num::ParseFloatError> for InterpretError {
+    fn from(value: std::num::ParseFloatError) -> Self {
+        Self::NumParse(value)
+    }
+}
+
+type InterpretResult<T> = Result<T, InterpretError>;
 
 fn repl() {
     let mut vm = VM::new();
@@ -50,7 +57,7 @@ fn repl() {
             continue;
         }
 
-        let interpret_result = vm.interpret(std::mem::take(&mut input));
+        let interpret_result = vm.interpret(&std::mem::take(&mut input));
         if let Err(e) = interpret_result {
             // TODO: Debug -> Display
             eprintln!("Error interpreting input: {e:?}");
@@ -58,15 +65,17 @@ fn repl() {
     }
 }
 
-fn run_file(p: PathBuf) -> InterpretResult {
+fn run_file(p: PathBuf) -> InterpretResult<()> {
     let mut vm = VM::new();
 
-    let file = File::open(p)?;
-    let source = BufReader::new(file).lines();
-    vm.interpret(source)
+    let source = read_to_string(p)?;
+
+    let interpret_result = vm.interpret(&source);
+
+    interpret_result
 }
 
-fn main() -> InterpretResult {
+fn main() -> InterpretResult<()> {
     let args = Args::parse();
 
     match args.path {
