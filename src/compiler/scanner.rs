@@ -36,9 +36,31 @@ static KEYWORDS: LazyLock<HashMap<&'static str, TokenKind>> = LazyLock::new(|| {
     hs
 });
 
+// We need the first byte of the next character, not the current character, to use as an exclusive
+// upper bound for lexeme generation. To make this a bit more convenient, we use this wrapper
+// around the base CharIndices that performs the offset calculation automatically.
+struct CharIndicesNext<'a> {
+    inner: CharIndices<'a>,
+}
+
+impl<'a> CharIndicesNext<'a> {
+    fn new(inner: CharIndices<'a>) -> Self {
+        Self { inner }
+    }
+}
+
+impl<'a> Iterator for CharIndicesNext<'a> {
+    type Item = (usize, char);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let (i, ch) = self.inner.next()?;
+        Some((i + ch.len_utf8(), ch))
+    }
+}
+
 pub struct Scanner<'a> {
     source: &'a str,
-    source_iter: Peekable<CharIndices<'a>>,
+    source_iter: Peekable<CharIndicesNext<'a>>,
     start: usize,
     current: usize,
     line: LineNum,
@@ -48,11 +70,16 @@ impl<'a> Scanner<'a> {
     pub fn new(source: &'a str) -> Self {
         Self {
             source,
-            source_iter: source.char_indices().peekable(),
+            // TODO: Make this postfix
+            source_iter: CharIndicesNext::new(source.char_indices()).peekable(),
             start: 0,
             current: 0,
             line: 1,
         }
+    }
+
+    fn generate_lexeme(&self) -> Option<&str> {
+        self.source.get(self.start..self.current)
     }
 
     fn make_token(&self, kind: TokenKind<'a>) -> Option<Token<'a>> {
@@ -72,7 +99,7 @@ impl<'a> Scanner<'a> {
                 self.line += 1;
             }
 
-            self.current = *i + ch.len_utf8();
+            self.current = *i;
             self.source_iter.next();
         }
     }
@@ -90,7 +117,7 @@ impl<'a> Scanner<'a> {
     fn string(&mut self) -> InterpretResult<Token<'a>> {
         while let Some((i, ch)) = self.source_iter.next() {
             if ch == '"' {
-                self.current = i + ch.len_utf8();
+                self.current = i;
                 // LParen is a placeholder; reusing lexeme logic from make_token
                 // TODO: Think about this unwrap
                 let mut token = self.make_token(TokenKind::LParen).unwrap();
@@ -108,7 +135,7 @@ impl<'a> Scanner<'a> {
         while let Some((i, ch)) = self.source_iter.peek()
             && (ch.is_numeric() || *ch == '.')
         {
-            self.current = i + ch.len_utf8();
+            self.current = *i;
             self.source_iter.next();
         }
 
@@ -124,7 +151,7 @@ impl<'a> Scanner<'a> {
         while let Some((i, ch)) = self.source_iter.peek()
             && (is_ident_char(*ch) || ch.is_numeric())
         {
-            self.current = i + ch.len_utf8();
+            self.current = *i;
             self.source_iter.next();
         }
 
@@ -154,7 +181,7 @@ impl<'a> Iterator for Scanner<'a> {
 
         self.start = self.current;
         let (i, ch) = self.source_iter.next()?;
-        self.current = i + ch.len_utf8();
+        self.current = i;
 
         use TokenKind as TK;
         Some(match ch {
