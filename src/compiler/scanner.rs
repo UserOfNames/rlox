@@ -77,7 +77,6 @@ impl<'a> Scanner<'a> {
         Some(Token {
             kind,
             line: self.line,
-            // TODO: Is passing this error necessary?
             lexeme: self.make_lexeme()?,
         })
     }
@@ -105,39 +104,42 @@ impl<'a> Scanner<'a> {
         }
     }
 
-    fn string(&mut self) -> InterpretResult<Token<'a>> {
+    fn string(&mut self) -> Option<InterpretResult<Token<'a>>> {
         self.consume_while(|c| c != '"');
 
-        // Consume the closing double quote. consume_while() already peeked at this value, so we
-        // know it exists and is a double quote.
-        self.inner_next().unwrap();
+        // Consume the closing double quote, or err if the string is unclosed
+        match self.inner_next().ok_or(InterpretError::Compiler) {
+            Ok(_) => {}
+            Err(e) => return Some(Err(e)),
+        };
 
-        let lexeme = self.make_lexeme().unwrap();
+        let lexeme = self.make_lexeme()?;
         let s = Cow::Borrowed(lexeme);
-        let token = self.make_token(TokenKind::String(s)).unwrap();
-        Ok(token)
+        let token = self.make_token(TokenKind::String(s))?;
+        Some(Ok(token))
     }
 
-    fn number(&mut self) -> InterpretResult<Token<'a>> {
+    fn number(&mut self) -> Option<InterpretResult<Token<'a>>> {
         self.consume_while(|c| c.is_numeric() || c == '.');
 
-        // TODO: Think about this unwrap
-        let lexeme = self.make_lexeme().unwrap();
-        let n = lexeme.parse()?;
-        let token = self.make_token(TokenKind::Number(n)).unwrap();
-        Ok(token)
+        let lexeme = self.make_lexeme()?;
+        let n: f64 = match lexeme.parse() {
+            Ok(n) => n,
+            Err(e) => return Some(Err(e.into())),
+        };
+
+        let token = self.make_token(TokenKind::Number(n))?;
+        Some(Ok(token))
     }
 
-    fn identifier(&mut self) -> Token<'a> {
+    fn identifier(&mut self) -> Option<Token<'a>> {
         self.consume_while(|c| is_ident_char(c) || c.is_numeric());
 
-        // TODO: Think about this unwrap
-        let lexeme = self.make_lexeme().unwrap();
+        let lexeme = self.make_lexeme()?;
         if let Some(keyword) = KEYWORDS.get(lexeme) {
-            // TODO: Think about this unwrap
-            self.make_token(keyword.clone()).unwrap()
+            self.make_token(keyword.clone())
         } else {
-            self.make_token(TokenKind::Identifier(lexeme)).unwrap()
+            self.make_token(TokenKind::Identifier(lexeme))
         }
     }
 }
@@ -186,9 +188,9 @@ impl<'a> Iterator for Scanner<'a> {
                 '<' => Ok(self.guess('=', TK::LtEq, TK::Lt)?),
                 '>' => Ok(self.guess('=', TK::GtEq, TK::Gt)?),
 
-                '"' => self.string(),
-                c if c.is_numeric() => self.number(),
-                c if is_ident_char(c) => Ok(self.identifier()),
+                '"' => self.string()?,
+                c if c.is_numeric() => self.number()?,
+                c if is_ident_char(c) => Ok(self.identifier()?),
 
                 _ => Err(InterpretError::Compiler),
             };
