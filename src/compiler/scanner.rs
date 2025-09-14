@@ -78,6 +78,23 @@ impl<'a> Scanner<'a> {
         }
     }
 
+    // Helper method to keep source_iter and current in sync
+    fn inner_next(&mut self) -> Option<(usize, char)> {
+        let (i, ch) = self.source_iter.next()?;
+        self.current = i;
+        Some((i, ch))
+    }
+
+    /// Consume characters in the source iterator until the predicate is false of the iterator is
+    /// exhausted.
+    fn consume_while(&mut self, predicate: impl Fn(char) -> bool) {
+        while let Some((_, ch)) = self.source_iter.peek()
+            && predicate(*ch)
+        {
+            self.inner_next();
+        }
+    }
+
     fn make_lexeme(&self) -> Option<&'a str> {
         self.source.get(self.start..self.current)
     }
@@ -92,22 +109,22 @@ impl<'a> Scanner<'a> {
     }
 
     fn skip_whitespace(&mut self) {
-        while let Some((i, ch)) = self.source_iter.peek()
+        while let Some((_, ch)) = self.source_iter.peek()
             && ch.is_whitespace()
         {
+            // This additional logic prevents the usage of consume_while
             if *ch == '\n' {
                 self.line += 1;
             }
 
-            self.current = *i;
-            self.source_iter.next();
+            self.inner_next();
         }
     }
 
     fn guess(&mut self, guess: char, yes: TokenKind<'a>, no: TokenKind<'a>) -> Option<Token<'a>> {
         let (_, ch) = self.source_iter.peek()?;
         if *ch == guess {
-            self.source_iter.next();
+            self.inner_next();
             Some(self.make_token(yes)?)
         } else {
             Some(self.make_token(no)?)
@@ -115,28 +132,20 @@ impl<'a> Scanner<'a> {
     }
 
     fn string(&mut self) -> InterpretResult<Token<'a>> {
-        while let Some((i, ch)) = self.source_iter.next() {
-            if ch == '"' {
-                self.current = i;
-                // TODO: Think about this unwrap
-                let lexeme = self.make_lexeme().unwrap();
-                let s = Cow::Borrowed(lexeme);
-                let token = self.make_token(TokenKind::String(s)).unwrap();
-                return Ok(token);
-            }
-        }
+        self.consume_while(|c| c != '"');
 
-        // If we get here, the string was not closed
-        Err(InterpretError::Compiler)
+        // Consume the closing double quote. consume_while() already peeked at this value, so we
+        // know it exists and is a double quote.
+        self.inner_next();
+
+        let lexeme = self.make_lexeme().unwrap();
+        let s = Cow::Borrowed(lexeme);
+        let token = self.make_token(TokenKind::String(s)).unwrap();
+        Ok(token)
     }
 
     fn number(&mut self) -> InterpretResult<Token<'a>> {
-        while let Some((i, ch)) = self.source_iter.peek()
-            && (ch.is_numeric() || *ch == '.')
-        {
-            self.current = *i;
-            self.source_iter.next();
-        }
+        self.consume_while(|c| c.is_numeric() || c == '.');
 
         // TODO: Think about this unwrap
         let lexeme = self.make_lexeme().unwrap();
@@ -146,12 +155,7 @@ impl<'a> Scanner<'a> {
     }
 
     fn identifier(&mut self) -> Token<'a> {
-        while let Some((i, ch)) = self.source_iter.peek()
-            && (is_ident_char(*ch) || ch.is_numeric())
-        {
-            self.current = *i;
-            self.source_iter.next();
-        }
+        self.consume_while(|c| is_ident_char(c) || c.is_numeric());
 
         // TODO: Think about this unwrap
         let lexeme = self.make_lexeme().unwrap();
@@ -175,8 +179,7 @@ impl<'a> Iterator for Scanner<'a> {
         self.skip_whitespace();
 
         self.start = self.current;
-        let (i, ch) = self.source_iter.next()?;
-        self.current = i;
+        let (_, ch) = self.inner_next()?;
 
         use TokenKind as TK;
         Some(match ch {
