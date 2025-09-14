@@ -1,6 +1,3 @@
-// TODO: Do i + ch.len_utf8() or source_iter.peek()? Or wrap char_indices in a custom iteator?
-// TODO: Remove self.current?
-
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::iter::Peekable;
@@ -36,31 +33,9 @@ static KEYWORDS: LazyLock<HashMap<&'static str, TokenKind>> = LazyLock::new(|| {
     hs
 });
 
-// We need the first byte of the next character, not the current character, to use as an exclusive
-// upper bound for lexeme generation. To make this a bit more convenient, we use this wrapper
-// around the base CharIndices that performs the offset calculation automatically.
-struct CharIndicesNext<'a> {
-    inner: CharIndices<'a>,
-}
-
-impl<'a> CharIndicesNext<'a> {
-    fn new(inner: CharIndices<'a>) -> Self {
-        Self { inner }
-    }
-}
-
-impl<'a> Iterator for CharIndicesNext<'a> {
-    type Item = (usize, char);
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let (i, ch) = self.inner.next()?;
-        Some((i + ch.len_utf8(), ch))
-    }
-}
-
 pub struct Scanner<'a> {
     source: &'a str,
-    source_iter: Peekable<CharIndicesNext<'a>>,
+    source_iter: Peekable<CharIndices<'a>>,
     start: usize,
     current: usize,
     line: LineNum,
@@ -70,18 +45,17 @@ impl<'a> Scanner<'a> {
     pub fn new(source: &'a str) -> Self {
         Self {
             source,
-            // TODO: Make this postfix
-            source_iter: CharIndicesNext::new(source.char_indices()).peekable(),
+            source_iter: source.char_indices().peekable(),
             start: 0,
             current: 0,
             line: 1,
         }
     }
 
-    // Helper method to keep source_iter and current in sync
+    /// Helper method to keep source_iter and current in sync
     fn inner_next(&mut self) -> Option<(usize, char)> {
         let (i, ch) = self.source_iter.next()?;
-        self.current = i;
+        self.current = i + ch.len_utf8();
         Some((i, ch))
     }
 
@@ -136,7 +110,7 @@ impl<'a> Scanner<'a> {
 
         // Consume the closing double quote. consume_while() already peeked at this value, so we
         // know it exists and is a double quote.
-        self.inner_next();
+        self.inner_next().unwrap();
 
         let lexeme = self.make_lexeme().unwrap();
         let s = Cow::Borrowed(lexeme);
