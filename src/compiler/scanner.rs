@@ -59,7 +59,7 @@ impl<'a> Scanner<'a> {
         Some((i, ch))
     }
 
-    /// Consume characters in the source iterator until the predicate is false of the iterator is
+    /// Consume characters in the source iterator until the predicate is false or the iterator is
     /// exhausted.
     fn consume_while(&mut self, predicate: impl Fn(char) -> bool) {
         while let Some((_, ch)) = self.source_iter.peek()
@@ -150,50 +150,50 @@ impl<'a> Iterator for Scanner<'a> {
     type Item = InterpretResult<Token<'a>>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.skip_whitespace();
+        loop {
+            self.skip_whitespace();
+            self.start = self.current;
 
-        self.start = self.current;
-        let (_, ch) = self.inner_next()?;
+            let (_, ch) = self.inner_next()?;
 
-        use TokenKind as TK;
-        Some(match ch {
-            '(' => Ok(self.make_token(TK::LParen)?),
-            ')' => Ok(self.make_token(TK::RParen)?),
-            '{' => Ok(self.make_token(TK::LCurly)?),
-            '}' => Ok(self.make_token(TK::RCurly)?),
-            ';' => Ok(self.make_token(TK::Semicolon)?),
-            ',' => Ok(self.make_token(TK::Comma)?),
-            '.' => Ok(self.make_token(TK::Dot)?),
-            '+' => Ok(self.make_token(TK::Plus)?),
-            '-' => Ok(self.make_token(TK::Minus)?),
-            '*' => Ok(self.make_token(TK::Star)?),
+            use TokenKind as TK;
+            let result = match ch {
+                '(' => Ok(self.make_token(TK::LParen)?),
+                ')' => Ok(self.make_token(TK::RParen)?),
+                '{' => Ok(self.make_token(TK::LCurly)?),
+                '}' => Ok(self.make_token(TK::RCurly)?),
+                ';' => Ok(self.make_token(TK::Semicolon)?),
+                ',' => Ok(self.make_token(TK::Comma)?),
+                '.' => Ok(self.make_token(TK::Dot)?),
+                '+' => Ok(self.make_token(TK::Plus)?),
+                '-' => Ok(self.make_token(TK::Minus)?),
+                '*' => Ok(self.make_token(TK::Star)?),
 
-            '/' => {
-                // HACK: This is disgusting, fix this later
-                if self.source_iter.peek()?.1 == '/' {
-                    while let Some((_, ch)) = self.source_iter.next()
-                        && ch != '\n'
-                    {
-                        self.current += 1;
+                '/' => {
+                    if self.source_iter.peek()?.1 == '/' {
+                        // '//' is a comment, so skip the rest of the line
+                        // The newline itself will be handled on the next loop by skip_whitespace. It
+                        // will also handle the increment of self.line
+                        self.consume_while(|c| c != '\n');
+                        continue;
+                    } else {
+                        Ok(self.make_token(TK::Slash)?)
                     }
-                    self.current += 1;
-                    self.line += 1;
-                    self.next()?
-                } else {
-                    Ok(self.make_token(TK::Slash)?)
                 }
-            }
 
-            '!' => Ok(self.guess('=', TK::BangEq, TK::Bang)?),
-            '=' => Ok(self.guess('=', TK::EqEq, TK::Eq)?),
-            '<' => Ok(self.guess('=', TK::LtEq, TK::Lt)?),
-            '>' => Ok(self.guess('=', TK::GtEq, TK::Gt)?),
+                '!' => Ok(self.guess('=', TK::BangEq, TK::Bang)?),
+                '=' => Ok(self.guess('=', TK::EqEq, TK::Eq)?),
+                '<' => Ok(self.guess('=', TK::LtEq, TK::Lt)?),
+                '>' => Ok(self.guess('=', TK::GtEq, TK::Gt)?),
 
-            '"' => self.string(),
-            c if c.is_numeric() => self.number(),
-            c if is_ident_char(c) => Ok(self.identifier()),
+                '"' => self.string(),
+                c if c.is_numeric() => self.number(),
+                c if is_ident_char(c) => Ok(self.identifier()),
 
-            _ => Err(InterpretError::Compiler),
-        })
+                _ => Err(InterpretError::Compiler),
+            };
+
+            return Some(result);
+        }
     }
 }
