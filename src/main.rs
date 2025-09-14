@@ -2,7 +2,7 @@ mod chunk;
 mod compiler; // TODO: Move?
 mod vm;
 
-use std::fs::{read_to_string};
+use std::fs::read_to_string;
 use std::io::{self, BufRead, Write, stdin, stdout};
 use std::path::PathBuf;
 

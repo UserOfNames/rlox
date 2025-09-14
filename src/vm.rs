@@ -18,8 +18,8 @@ impl VM {
     }
 
     pub fn interpret(&mut self, source: &str) -> InterpretResult<()> {
-        compile(source)?;
-        Ok(())
+        self.chunk = compile(source)?;
+        self.run()
     }
 
     fn run(&mut self) -> InterpretResult<()> {

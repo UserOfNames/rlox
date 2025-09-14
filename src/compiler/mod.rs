@@ -2,18 +2,25 @@ mod scanner;
 mod token;
 
 use crate::InterpretResult;
-use crate::chunk::LineNum;
+use crate::chunk::Chunk;
 
-use super::compiler::token::{Token, TokenKind};
 use scanner::Scanner;
 
-pub fn compile(source: &str) -> InterpretResult<()> {
-    let mut source_iter = source.char_indices();
-    let mut scanner = Scanner::new(source);
-    for token in scanner {
-        let token = token?;
-        println!("{token}");
+pub fn compile(source: &str) -> InterpretResult<Chunk> {
+    let c = Chunk::new();
+
+    let scanner = Scanner::new(source);
+
+    for token_res in scanner {
+        let token = match token_res {
+            Ok(t) => t,
+            Err(e) => {
+                // TODO: Error handling
+                eprintln!("Error: {e:?}");
+                continue;
+            }
+        };
     }
 
-    Ok(())
+    Ok(c)
 }
