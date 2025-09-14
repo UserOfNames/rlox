@@ -78,7 +78,7 @@ impl<'a> Scanner<'a> {
         }
     }
 
-    fn generate_lexeme(&self) -> Option<&str> {
+    fn make_lexeme(&self) -> Option<&'a str> {
         self.source.get(self.start..self.current)
     }
 
@@ -87,7 +87,7 @@ impl<'a> Scanner<'a> {
             kind,
             line: self.line,
             // TODO: Is passing this error necessary?
-            lexeme: self.source.get(self.start..self.current)?,
+            lexeme: self.make_lexeme()?,
         })
     }
 
@@ -118,11 +118,10 @@ impl<'a> Scanner<'a> {
         while let Some((i, ch)) = self.source_iter.next() {
             if ch == '"' {
                 self.current = i;
-                // LParen is a placeholder; reusing lexeme logic from make_token
                 // TODO: Think about this unwrap
-                let mut token = self.make_token(TokenKind::LParen).unwrap();
-                let s = Cow::Borrowed(token.lexeme);
-                token.kind = TokenKind::String(s);
+                let lexeme = self.make_lexeme().unwrap();
+                let s = Cow::Borrowed(lexeme);
+                let token = self.make_token(TokenKind::String(s)).unwrap();
                 return Ok(token);
             }
         }
@@ -139,11 +138,10 @@ impl<'a> Scanner<'a> {
             self.source_iter.next();
         }
 
-        // LParen is a placeholder; reusing lexeme logic from make_token
         // TODO: Think about this unwrap
-        let mut token = self.make_token(TokenKind::LParen).unwrap();
-        let n = token.lexeme.parse()?;
-        token.kind = TokenKind::Number(n);
+        let lexeme = self.make_lexeme().unwrap();
+        let n = lexeme.parse()?;
+        let token = self.make_token(TokenKind::Number(n)).unwrap();
         Ok(token)
     }
 
@@ -155,16 +153,13 @@ impl<'a> Scanner<'a> {
             self.source_iter.next();
         }
 
-        // LParen is a placeholder; reusing lexeme logic from make_token
         // TODO: Think about this unwrap
-        let mut token = self.make_token(TokenKind::LParen).unwrap();
-        let word = token.lexeme;
-        if let Some(keyword) = KEYWORDS.get(word) {
+        let lexeme = self.make_lexeme().unwrap();
+        if let Some(keyword) = KEYWORDS.get(lexeme) {
             // TODO: Think about this unwrap
             self.make_token(keyword.clone()).unwrap()
         } else {
-            token.kind = TokenKind::Identifier(word);
-            token
+            self.make_token(TokenKind::Identifier(lexeme)).unwrap()
         }
     }
 }
