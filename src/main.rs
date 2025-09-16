@@ -2,12 +2,14 @@ mod chunk;
 mod compiler; // TODO: Move?
 mod vm;
 
+use std::fmt;
 use std::fs::read_to_string;
 use std::io::{self, BufRead, Write, stdin, stdout};
 use std::path::PathBuf;
 
 use clap::Parser;
 
+use compiler::CompilerError;
 use vm::VM;
 
 #[derive(Debug, Parser)]
@@ -17,13 +19,11 @@ struct Args {
     path: Option<PathBuf>,
 }
 
-// TODO: impl Error
 #[derive(Debug)]
 pub enum InterpretError {
-    Compiler,
+    Compiler(CompilerError),
     Runtime,
     Io(io::Error),
-    NumParse(std::num::ParseFloatError),
 }
 
 impl From<io::Error> for InterpretError {
@@ -32,11 +32,17 @@ impl From<io::Error> for InterpretError {
     }
 }
 
-impl From<std::num::ParseFloatError> for InterpretError {
-    fn from(value: std::num::ParseFloatError) -> Self {
-        Self::NumParse(value)
+impl fmt::Display for InterpretError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Compiler(_) => write!(f, "Could not compile"),
+            Self::Runtime => write!(f, "Runtime error"),
+            Self::Io(e) => write!(f, "IO error: {e}"),
+        }
     }
 }
+
+impl std::error::Error for InterpretError {}
 
 type InterpretResult<T> = Result<T, InterpretError>;
 
@@ -59,8 +65,7 @@ fn repl() {
 
         let interpret_result = vm.interpret(&std::mem::take(&mut input));
         if let Err(e) = interpret_result {
-            // TODO: Debug -> Display
-            eprintln!("Error interpreting input: {e:?}");
+            eprintln!("Error interpreting input: {e}");
         }
     }
 }

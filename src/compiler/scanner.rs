@@ -5,7 +5,7 @@ use std::str::CharIndices;
 use std::sync::LazyLock;
 
 use crate::chunk::LineNum;
-use crate::{InterpretError, InterpretResult};
+use crate::compiler::{CompilerError, CompilerResult};
 
 use super::token::{Token, TokenKind};
 
@@ -53,7 +53,7 @@ impl<'a> Scanner<'a> {
     }
 
     /// Helper method to keep source_iter and current in sync
-    fn inner_next(&mut self) -> Option<(usize, char)> {
+    fn advance(&mut self) -> Option<(usize, char)> {
         let (i, ch) = self.source_iter.next()?;
         self.current = i + ch.len_utf8();
         Some((i, ch))
@@ -65,7 +65,7 @@ impl<'a> Scanner<'a> {
         while let Some((_, ch)) = self.source_iter.peek()
             && predicate(*ch)
         {
-            self.inner_next();
+            self.advance();
         }
     }
 
@@ -90,25 +90,33 @@ impl<'a> Scanner<'a> {
                 self.line += 1;
             }
 
-            self.inner_next();
+            self.advance();
         }
     }
 
-    fn guess(&mut self, guess: char, yes: TokenKind<'a>, no: TokenKind<'a>) -> Option<Token<'a>> {
+    fn match_next(
+        &mut self,
+        guess: char,
+        yes: TokenKind<'a>,
+        no: TokenKind<'a>,
+    ) -> Option<Token<'a>> {
         let (_, ch) = self.source_iter.peek()?;
         if *ch == guess {
-            self.inner_next();
+            self.advance();
             Some(self.make_token(yes)?)
         } else {
             Some(self.make_token(no)?)
         }
     }
 
-    fn string(&mut self) -> Option<InterpretResult<Token<'a>>> {
+    fn string(&mut self) -> Option<CompilerResult<Token<'a>>> {
         self.consume_while(|c| c != '"');
 
         // Consume the closing double quote, or err if the string is unclosed
-        match self.inner_next().ok_or(InterpretError::Compiler) {
+        match self
+            .advance()
+            .ok_or(CompilerError::UnterminatedString(self.line))
+        {
             Ok(_) => {}
             Err(e) => return Some(Err(e)),
         };
@@ -119,13 +127,16 @@ impl<'a> Scanner<'a> {
         Some(Ok(token))
     }
 
-    fn number(&mut self) -> Option<InterpretResult<Token<'a>>> {
+    fn number(&mut self) -> Option<CompilerResult<Token<'a>>> {
         self.consume_while(|c| c.is_numeric() || c == '.');
 
         let lexeme = self.make_lexeme()?;
         let n: f64 = match lexeme.parse() {
             Ok(n) => n,
-            Err(e) => return Some(Err(e.into())),
+            Err(_) => {
+                let error = CompilerError::BadNumber(self.line, lexeme.to_string());
+                return Some(Err(error));
+            }
         };
 
         let token = self.make_token(TokenKind::Number(n))?;
@@ -149,14 +160,14 @@ fn is_ident_char(c: char) -> bool {
 }
 
 impl<'a> Iterator for Scanner<'a> {
-    type Item = InterpretResult<Token<'a>>;
+    type Item = CompilerResult<Token<'a>>;
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
             self.skip_whitespace();
             self.start = self.current;
 
-            let (_, ch) = self.inner_next()?;
+            let (_, ch) = self.advance()?;
 
             use TokenKind as TK;
             let result = match ch {
@@ -183,16 +194,16 @@ impl<'a> Iterator for Scanner<'a> {
                     }
                 }
 
-                '!' => Ok(self.guess('=', TK::BangEq, TK::Bang)?),
-                '=' => Ok(self.guess('=', TK::EqEq, TK::Eq)?),
-                '<' => Ok(self.guess('=', TK::LtEq, TK::Lt)?),
-                '>' => Ok(self.guess('=', TK::GtEq, TK::Gt)?),
+                '!' => Ok(self.match_next('=', TK::BangEq, TK::Bang)?),
+                '=' => Ok(self.match_next('=', TK::EqEq, TK::Eq)?),
+                '<' => Ok(self.match_next('=', TK::LtEq, TK::Lt)?),
+                '>' => Ok(self.match_next('=', TK::GtEq, TK::Gt)?),
 
                 '"' => self.string()?,
                 c if c.is_numeric() => self.number()?,
                 c if is_ident_char(c) => Ok(self.identifier()?),
 
-                _ => Err(InterpretError::Compiler),
+                _ => Err(CompilerError::BadChar(self.line, ch)),
             };
 
             return Some(result);
