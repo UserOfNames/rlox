@@ -115,7 +115,7 @@ impl<'a> Scanner<'a> {
         // Consume the closing double quote, or err if the string is unclosed
         match self
             .advance()
-            .ok_or(CompilerError::UnterminatedString(self.line))
+            .ok_or(CompilerError::UnterminatedString { line: self.line })
         {
             Ok(_) => {}
             Err(e) => return Some(Err(e)),
@@ -134,7 +134,11 @@ impl<'a> Scanner<'a> {
         let n: f64 = match lexeme.parse() {
             Ok(n) => n,
             Err(_) => {
-                let error = CompilerError::BadNumber(self.line, lexeme.to_string());
+                let error = CompilerError::BadNumber {
+                    line: self.line,
+                    n: lexeme.to_string(),
+                };
+
                 return Some(Err(error));
             }
         };
@@ -203,7 +207,10 @@ impl<'a> Iterator for Scanner<'a> {
                 c if c.is_numeric() => self.number()?,
                 c if is_ident_char(c) => Ok(self.identifier()?),
 
-                _ => Err(CompilerError::BadChar(self.line, ch)),
+                _ => Err(CompilerError::BadChar {
+                    line: self.line,
+                    c: ch,
+                }),
             };
 
             return Some(result);

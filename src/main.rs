@@ -2,12 +2,12 @@ mod chunk;
 mod compiler; // TODO: Move?
 mod vm;
 
-use std::fmt;
 use std::fs::read_to_string;
 use std::io::{self, BufRead, Write, stdin, stdout};
 use std::path::PathBuf;
 
 use clap::Parser;
+use thiserror::Error;
 
 use compiler::CompilerError;
 use vm::VM;
@@ -19,30 +19,15 @@ struct Args {
     path: Option<PathBuf>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum InterpretError {
+    #[error("Could not compile")]
     Compiler(CompilerError),
+    #[error("Runtime error")]
     Runtime,
-    Io(io::Error),
+    #[error("IO error: {0}")]
+    Io(#[from] io::Error),
 }
-
-impl From<io::Error> for InterpretError {
-    fn from(value: io::Error) -> Self {
-        Self::Io(value)
-    }
-}
-
-impl fmt::Display for InterpretError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Compiler(_) => write!(f, "Could not compile"),
-            Self::Runtime => write!(f, "Runtime error"),
-            Self::Io(e) => write!(f, "IO error: {e}"),
-        }
-    }
-}
-
-impl std::error::Error for InterpretError {}
 
 type InterpretResult<T> = Result<T, InterpretError>;
 
@@ -75,9 +60,7 @@ fn run_file(p: PathBuf) -> InterpretResult<()> {
 
     let source = read_to_string(p)?;
 
-    let interpret_result = vm.interpret(&source);
-
-    interpret_result
+    vm.interpret(&source)
 }
 
 fn main() -> InterpretResult<()> {

@@ -1,39 +1,22 @@
 mod scanner;
 mod token;
 
-use std::fmt;
+use thiserror::Error;
 
 use crate::InterpretResult;
 use crate::chunk::{Chunk, LineNum};
 
 use scanner::Scanner;
 
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum CompilerError {
-    BadChar(LineNum, char),
-    BadNumber(LineNum, String),
-    UnterminatedString(LineNum),
+    #[error("Invalid character '{c}' on line {line}")]
+    BadChar { line: LineNum, c: char },
+    #[error("Could not parse number literal '{n}' on line {line}")]
+    BadNumber { line: LineNum, n: String },
+    #[error("Unterminated string on line {line}")]
+    UnterminatedString { line: LineNum },
 }
-
-impl fmt::Display for CompilerError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::BadChar(line, c) => {
-                write!(f, "Invalid character '{c}' on line {line}")
-            }
-
-            Self::BadNumber(line, n) => {
-                write!(f, "Could not parse number literal '{n}' on line {line}")
-            }
-
-            Self::UnterminatedString(line) => {
-                write!(f, "Unterminated string on line {line}")
-            }
-        }
-    }
-}
-
-impl std::error::Error for CompilerError {}
 
 pub type CompilerResult<T> = Result<T, CompilerError>;
 
