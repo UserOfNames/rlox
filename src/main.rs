@@ -9,7 +9,6 @@ use std::path::PathBuf;
 use clap::Parser;
 use thiserror::Error;
 
-use compiler::CompilerError;
 use vm::VM;
 
 #[derive(Debug, Parser)]
@@ -21,8 +20,8 @@ struct Args {
 
 #[derive(Debug, Error)]
 pub enum InterpretError {
-    #[error("Could not compile")]
-    Compiler(CompilerError),
+    #[error("Compiler error")]
+    Compiler,
     #[error("Runtime error")]
     Runtime,
     #[error("IO error: {0}")]
@@ -67,7 +66,12 @@ fn main() -> InterpretResult<()> {
     let args = Args::parse();
 
     match args.path {
-        Some(p) => run_file(p)?,
+        Some(p) => {
+            if let Err(e) = run_file(p) {
+                eprintln!("{e}");
+            }
+        }
+
         None => repl(),
     }
 

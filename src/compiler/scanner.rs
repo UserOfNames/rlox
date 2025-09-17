@@ -4,10 +4,33 @@ use std::iter::Peekable;
 use std::str::CharIndices;
 use std::sync::LazyLock;
 
+use thiserror::Error;
+
 use crate::chunk::LineNum;
-use crate::compiler::{CompilerError, CompilerResult};
 
 use super::token::{Token, TokenKind};
+
+#[derive(Debug, Error)]
+pub enum ScannerError {
+    #[error("Invalid character '{c}'")]
+    BadChar { line: LineNum, c: char },
+    #[error("Could not parse number literal '{n}'")]
+    BadNumber { line: LineNum, n: String },
+    #[error("Unterminated string")]
+    UnterminatedString { line: LineNum },
+}
+
+impl ScannerError {
+    pub fn line(&self) -> LineNum {
+        *match self {
+            Self::BadChar { line, c: _ } => line,
+            Self::BadNumber { line, n: _ } => line,
+            Self::UnterminatedString { line } => line,
+        }
+    }
+}
+
+pub type ScannerResult<T> = Result<T, ScannerError>;
 
 // TODO: Not the best solution. The book recommends a trie; my understanding, from 30 seconds of
 // googling, is something about 'perfect hashing.' I'll look into that later. In any case, wrapping
@@ -109,13 +132,13 @@ impl<'a> Scanner<'a> {
         }
     }
 
-    fn string(&mut self) -> Option<CompilerResult<Token<'a>>> {
+    fn string(&mut self) -> Option<ScannerResult<Token<'a>>> {
         self.consume_while(|c| c != '"');
 
         // Consume the closing double quote, or err if the string is unclosed
         match self
             .advance()
-            .ok_or(CompilerError::UnterminatedString { line: self.line })
+            .ok_or(ScannerError::UnterminatedString { line: self.line })
         {
             Ok(_) => {}
             Err(e) => return Some(Err(e)),
@@ -127,14 +150,14 @@ impl<'a> Scanner<'a> {
         Some(Ok(token))
     }
 
-    fn number(&mut self) -> Option<CompilerResult<Token<'a>>> {
+    fn number(&mut self) -> Option<ScannerResult<Token<'a>>> {
         self.consume_while(|c| c.is_numeric() || c == '.');
 
         let lexeme = self.make_lexeme()?;
         let n: f64 = match lexeme.parse() {
             Ok(n) => n,
             Err(_) => {
-                let error = CompilerError::BadNumber {
+                let error = ScannerError::BadNumber {
                     line: self.line,
                     n: lexeme.to_string(),
                 };
@@ -164,7 +187,7 @@ fn is_ident_char(c: char) -> bool {
 }
 
 impl<'a> Iterator for Scanner<'a> {
-    type Item = CompilerResult<Token<'a>>;
+    type Item = ScannerResult<Token<'a>>;
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
@@ -207,7 +230,7 @@ impl<'a> Iterator for Scanner<'a> {
                 c if c.is_numeric() => self.number()?,
                 c if is_ident_char(c) => Ok(self.identifier()?),
 
-                _ => Err(CompilerError::BadChar {
+                _ => Err(ScannerError::BadChar {
                     line: self.line,
                     c: ch,
                 }),
