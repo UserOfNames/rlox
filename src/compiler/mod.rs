@@ -1,30 +1,34 @@
+mod parser;
 mod scanner;
 mod token;
 
 use crate::chunk::Chunk;
 use crate::{InterpretError, InterpretResult};
 
+use parser::Parser;
 use scanner::Scanner;
 
 pub fn compile(source: &str) -> InterpretResult<Chunk> {
     let c = Chunk::new();
 
-    let mut erred = false;
+    let mut parser = Parser::new();
+
     let scanner = Scanner::new(source);
 
     for token_res in scanner {
         let token = match token_res {
             Ok(t) => t,
             Err(e) => {
-                erred = true;
-                let line = e.line();
-                eprintln!("[Line {line}] Error: {e}");
+                parser.erred = true;
+                eprintln!("[Line {}] Syntax error: {}\n", e.line(), e);
+                parser.panicking = true;
                 continue;
             }
         };
+        parser.panicking = false;
     }
 
-    if erred {
+    if parser.erred {
         Err(InterpretError::Compiler)
     } else {
         Ok(c)

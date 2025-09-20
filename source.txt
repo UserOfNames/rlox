@@ -16,5 +16,9 @@ $
 
 1.1.1
 
+"multi
+line
+string"
+
 and andd this thiss _this
 $$$
