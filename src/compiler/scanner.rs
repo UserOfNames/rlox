@@ -1,8 +1,6 @@
 use std::borrow::Cow;
-use std::collections::HashMap;
 use std::iter::Peekable;
 use std::str::CharIndices;
-use std::sync::LazyLock;
 
 use thiserror::Error;
 
@@ -32,29 +30,24 @@ impl ScannerError {
 
 pub type ScannerResult<T> = Result<T, ScannerError>;
 
-// TODO: Not the best solution. The book recommends a trie; my understanding, from 30 seconds of
-// googling, is something about 'perfect hashing.' I'll look into that later. In any case, wrapping
-// a dynamic hashset for a set of values that are all known at compile time definitely sucks.
-static KEYWORDS: LazyLock<HashMap<&'static str, TokenKind>> = LazyLock::new(|| {
-    let mut hs = HashMap::new();
-    hs.insert("and", TokenKind::And);
-    hs.insert("or", TokenKind::Or);
-    hs.insert("true", TokenKind::True);
-    hs.insert("false", TokenKind::False);
-    hs.insert("if", TokenKind::If);
-    hs.insert("else", TokenKind::Else);
-    hs.insert("while", TokenKind::While);
-    hs.insert("for", TokenKind::For);
-    hs.insert("class", TokenKind::Class);
-    hs.insert("super", TokenKind::Super);
-    hs.insert("this", TokenKind::This);
-    hs.insert("fun", TokenKind::Fun);
-    hs.insert("return", TokenKind::Return);
-    hs.insert("nil", TokenKind::Nil);
-    hs.insert("print", TokenKind::Print);
-    hs.insert("var", TokenKind::Var);
-    hs
-});
+static KEYWORDS: phf::Map<&'static str, TokenKind> = phf::phf_map! {
+    "and" => TokenKind::And,
+    "or" => TokenKind::Or,
+    "true" => TokenKind::True,
+    "false" => TokenKind::False,
+    "if" => TokenKind::If,
+    "else" => TokenKind::Else,
+    "while" => TokenKind::While,
+    "for" => TokenKind::For,
+    "class" => TokenKind::Class,
+    "super" => TokenKind::Super,
+    "this" => TokenKind::This,
+    "fun" => TokenKind::Fun,
+    "return" => TokenKind::Return,
+    "nil" => TokenKind::Nil,
+    "print" => TokenKind::Print,
+    "var" => TokenKind::Var,
+};
 
 pub struct Scanner<'a> {
     source: &'a str,
