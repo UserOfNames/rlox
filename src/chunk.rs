@@ -3,8 +3,9 @@ use std::fmt::Write;
 pub type Value = f64;
 
 #[derive(Debug)]
+#[repr(u8)]
 pub enum OpCode {
-    Constant(usize),
+    Constant,
     Add,
     Sub,
     Mul,
@@ -13,11 +14,28 @@ pub enum OpCode {
     Return,
 }
 
+impl TryFrom<u8> for OpCode {
+    type Error = &'static str;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
+            x if x == OpCode::Constant as u8 => Ok(OpCode::Constant),
+            x if x == OpCode::Add as u8 => Ok(OpCode::Add),
+            x if x == OpCode::Sub as u8 => Ok(OpCode::Sub),
+            x if x == OpCode::Mul as u8 => Ok(OpCode::Mul),
+            x if x == OpCode::Div as u8 => Ok(OpCode::Div),
+            x if x == OpCode::Negate as u8 => Ok(OpCode::Negate),
+            x if x == OpCode::Return as u8 => Ok(OpCode::Return),
+            _ => Err("Invalid opcode"),
+        }
+    }
+}
+
 pub type LineNum = u32;
 
 #[derive(Debug)]
 pub struct Chunk {
-    pub code: Vec<OpCode>,
+    pub code: Vec<u8>,
     pub constants: Vec<Value>,
     lines: Vec<(LineNum, u16)>, // RLE, u16 is repetitions
 }
@@ -32,7 +50,7 @@ impl Chunk {
     }
 
     pub fn push_opcode(&mut self, opcode: OpCode, line: LineNum) {
-        self.code.push(opcode);
+        self.code.push(opcode as u8);
         self.push_line(line);
     }
 
@@ -41,12 +59,35 @@ impl Chunk {
         self.constants.len() - 1
     }
 
+    /// Called when `self.ip` is pointing to the offset stored immediately after an
+    /// `OpCode::Constant`. Resolves it into an offset, fetches the corresponding constant, and
+    /// returns (offset, constant).
+    pub fn get_constant(&self, lower: usize) -> Option<(usize, Value)> {
+        const USIZE_SIZE: usize = std::mem::size_of::<usize>();
+        let upper = lower.checked_add(USIZE_SIZE)?;
+
+        let bytes = self.code.get(lower..upper)?;
+        // This should be safe since get() already did the bounds checking for us
+        let bytes: [u8; USIZE_SIZE] = bytes.try_into().expect("Slice length OOB");
+
+        let const_i = usize::from_ne_bytes(bytes);
+        let constant = self.constants.get(const_i).copied()?;
+
+        Some((const_i, constant))
+    }
+
     pub fn push_const_opcode(&mut self, value: Value, line: LineNum) {
         let i = self.push_constant(value);
-        self.push_opcode(OpCode::Constant(i), line);
+        self.push_opcode(OpCode::Constant, line);
+        const USIZE_SIZE: usize = std::mem::size_of::<usize>();
+        for _ in 0..USIZE_SIZE {
+            self.push_line(line)
+        }
+        self.code.extend(i.to_ne_bytes());
     }
 
     pub fn push_line(&mut self, line: LineNum) {
+        // TODO: Push constant offset count
         if let Some(last) = self.lines.last_mut()
             && last.0 == line
         {
@@ -77,10 +118,11 @@ impl Chunk {
 
         // `write!`ing into a String is infallible
         write!(res, "{:04} {:4} ", i, line).unwrap();
-
-        match self.code.get(i)? {
-            OpCode::Constant(const_i) => {
-                let constant = self.constants.get(i)?;
+        let instruction = *self.code.get(i)?;
+        let instruction: OpCode = instruction.try_into().ok()?;
+        match instruction {
+            OpCode::Constant => {
+                let (const_i, constant) = self.get_constant(i + 1)?;
                 writeln!(res, "Constant {const_i}: {}", constant).unwrap();
             }
 

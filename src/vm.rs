@@ -31,21 +31,27 @@ impl VM {
                 println!("{}", self.chunk.disassemble_instruction(self.ip).unwrap());
             }
 
-            let instruction = &self
+            let &instruction = self
                 .chunk
                 .code
                 .get(self.ip)
                 .ok_or(InterpretError::Runtime)?;
             self.ip += 1;
 
-            match instruction {
-                OpCode::Constant(c) => {
+            // TODO: This error handling is kinda questionable
+            let code: OpCode = instruction
+                .try_into()
+                .map_err(|_| InterpretError::Runtime)?;
+
+            match code {
+                OpCode::Constant => {
                     // TODO: Model this properly (if Value isn't copy, deref will move)
-                    let constant = *self
+                    let (_i, constant) = self
                         .chunk
-                        .constants
-                        .get(*c)
+                        .get_constant(self.ip)
                         .ok_or(InterpretError::Runtime)?;
+                    // TODO: Organize this constant
+                    self.ip += std::mem::size_of::<usize>();
                     self.stack.push(constant);
                 }
 
