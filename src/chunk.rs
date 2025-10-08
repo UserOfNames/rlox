@@ -4,6 +4,8 @@ use crate::USIZE_SIZE;
 
 pub type Value = f64;
 
+pub const OPCODE_SIZE: u8 = 1;
+
 #[derive(Debug)]
 #[repr(u8)]
 pub enum OpCode {
@@ -39,7 +41,7 @@ pub type LineNum = u32;
 pub struct Chunk {
     pub code: Vec<u8>,
     pub constants: Vec<Value>,
-    lines: Vec<(LineNum, u16)>, // RLE, u16 is repetitions
+    lines: Vec<(LineNum, u16)>, // RLE: (line number, byte count)
 }
 
 impl Chunk {
@@ -53,7 +55,7 @@ impl Chunk {
 
     pub fn push_opcode(&mut self, opcode: OpCode, line: LineNum) {
         self.code.push(opcode as u8);
-        self.push_line(line);
+        self.push_line(line, OPCODE_SIZE as u16);
     }
 
     pub fn push_constant(&mut self, value: Value) -> usize {
@@ -79,21 +81,18 @@ impl Chunk {
 
     pub fn push_const_opcode(&mut self, value: Value, line: LineNum) {
         let i = self.push_constant(value);
-        self.push_opcode(OpCode::Constant, line);
-        for _ in 0..USIZE_SIZE {
-            self.push_line(line)
-        }
+        self.code.push(OpCode::Constant as u8);
+        self.push_line(line, (OPCODE_SIZE + USIZE_SIZE as u8) as u16);
         self.code.extend(i.to_ne_bytes());
     }
 
-    pub fn push_line(&mut self, line: LineNum) {
-        // TODO: Push constant offset count
+    pub fn push_line(&mut self, line: LineNum, byte_count: u16) {
         if let Some(last) = self.lines.last_mut()
             && last.0 == line
         {
-            last.1 += 1;
+            last.1 += byte_count;
         } else {
-            self.lines.push((line, 1));
+            self.lines.push((line, byte_count));
         }
     }
 
