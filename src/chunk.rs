@@ -4,7 +4,7 @@ use crate::USIZE_SIZE;
 
 pub type Value = f64;
 
-pub const OPCODE_SIZE: u8 = 1;
+pub const OPCODE_SIZE: usize = 1;
 
 #[derive(Debug)]
 #[repr(u8)]
@@ -41,7 +41,7 @@ pub type LineNum = u32;
 pub struct Chunk {
     pub code: Vec<u8>,
     pub constants: Vec<Value>,
-    lines: Vec<(LineNum, u16)>, // RLE: (line number, byte count)
+    lines: Vec<(LineNum, usize)>, // RLE: (line number, byte count)
 }
 
 impl Chunk {
@@ -55,7 +55,7 @@ impl Chunk {
 
     pub fn push_opcode(&mut self, opcode: OpCode, line: LineNum) {
         self.code.push(opcode as u8);
-        self.push_line(line, OPCODE_SIZE as u16);
+        self.push_line(line, OPCODE_SIZE);
     }
 
     pub fn push_constant(&mut self, value: Value) -> usize {
@@ -82,11 +82,11 @@ impl Chunk {
     pub fn push_const_opcode(&mut self, value: Value, line: LineNum) {
         let i = self.push_constant(value);
         self.code.push(OpCode::Constant as u8);
-        self.push_line(line, (OPCODE_SIZE + USIZE_SIZE as u8) as u16);
+        self.push_line(line, OPCODE_SIZE + USIZE_SIZE);
         self.code.extend(i.to_ne_bytes());
     }
 
-    pub fn push_line(&mut self, line: LineNum, byte_count: u16) {
+    pub fn push_line(&mut self, line: LineNum, byte_count: usize) {
         if let Some(last) = self.lines.last_mut()
             && last.0 == line
         {
@@ -98,8 +98,6 @@ impl Chunk {
 
     pub fn get_line(&self, mut i: usize) -> Option<LineNum> {
         for (line, count) in self.lines.iter().copied() {
-            let count = count as usize;
-
             if i < count {
                 return Some(line);
             }
@@ -116,13 +114,13 @@ impl Chunk {
         let mut res = String::new();
 
         // `write!`ing into a String is infallible
-        write!(res, "{:04} {:4} ", i, line).unwrap();
+        write!(res, "{i:04} {line:4} ").unwrap();
         let instruction = *self.code.get(i)?;
         let instruction: OpCode = instruction.try_into().ok()?;
         match instruction {
             OpCode::Constant => {
                 let (const_i, constant) = self.get_constant(i + 1)?;
-                writeln!(res, "Constant {const_i}: {}", constant).unwrap();
+                writeln!(res, "Constant {const_i}: {constant}").unwrap();
             }
 
             OpCode::Negate => writeln!(res, "Negate").unwrap(),
@@ -132,7 +130,7 @@ impl Chunk {
             OpCode::Div => writeln!(res, "Div").unwrap(),
 
             OpCode::Return => writeln!(res, "Return").unwrap(),
-        };
+        }
 
         Some(res)
     }
@@ -142,7 +140,7 @@ impl std::fmt::Display for Chunk {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for i in 0..self.code.len() {
             let formatted_instruction = self.disassemble_instruction(i).unwrap();
-            write!(f, "{}", formatted_instruction)?;
+            write!(f, "{formatted_instruction}")?;
         }
 
         Ok(())

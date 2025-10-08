@@ -21,9 +21,9 @@ pub enum ScannerError {
 impl ScannerError {
     pub fn line(&self) -> LineNum {
         *match self {
-            Self::BadChar { line, c: _ } => line,
-            Self::BadNumber { line, n: _ } => line,
-            Self::UnterminatedString { line } => line,
+            Self::BadChar { line, c: _ }
+            | Self::BadNumber { line, n: _ }
+            | Self::UnterminatedString { line } => line,
         }
     }
 }
@@ -68,7 +68,7 @@ impl<'a> Scanner<'a> {
         }
     }
 
-    /// Helper method to keep source_iter and current in sync
+    /// Helper method to keep `source_iter` and current in sync
     fn advance(&mut self) -> Option<(usize, char)> {
         let (i, ch) = self.source_iter.next()?;
         self.current = i + ch.len_utf8();
@@ -135,7 +135,7 @@ impl<'a> Scanner<'a> {
         {
             Ok(_) => {}
             Err(e) => return Some(Err(e)),
-        };
+        }
 
         let lexeme = self.make_lexeme()?;
         let s = Cow::Borrowed(lexeme);
@@ -147,16 +147,13 @@ impl<'a> Scanner<'a> {
         self.consume_while(|c| c.is_numeric() || c == '.');
 
         let lexeme = self.make_lexeme()?;
-        let n: f64 = match lexeme.parse() {
-            Ok(n) => n,
-            Err(_) => {
-                let error = ScannerError::BadNumber {
-                    line: self.line,
-                    n: lexeme.to_string(),
-                };
+        let Ok(n) = lexeme.parse() else {
+            let error = ScannerError::BadNumber {
+                line: self.line,
+                n: lexeme.to_string(),
+            };
 
-                return Some(Err(error));
-            }
+            return Some(Err(error));
         };
 
         let token = self.make_token(TokenKind::Number(n))?;
@@ -184,12 +181,13 @@ impl<'a> Iterator for Scanner<'a> {
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
+            use TokenKind as TK;
+
             self.skip_whitespace();
             self.start = self.current;
 
             let (_, ch) = self.advance()?;
 
-            use TokenKind as TK;
             let result = match ch {
                 '(' => Ok(self.make_token(TK::LParen)?),
                 ')' => Ok(self.make_token(TK::RParen)?),
@@ -209,9 +207,9 @@ impl<'a> Iterator for Scanner<'a> {
                         // will also handle the increment of self.line
                         self.consume_while(|c| c != '\n');
                         continue;
-                    } else {
-                        Ok(self.make_token(TK::Slash)?)
                     }
+
+                    Ok(self.make_token(TK::Slash)?)
                 }
 
                 '!' => Ok(self.match_next('=', TK::BangEq, TK::Bang)?),

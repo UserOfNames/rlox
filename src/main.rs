@@ -1,3 +1,5 @@
+#![warn(clippy::all, clippy::pedantic)]
+
 mod chunk;
 mod compiler; // TODO: Move?
 mod vm;
@@ -64,7 +66,7 @@ fn run_file(p: PathBuf) -> InterpretResult<()> {
     vm.interpret(&source)
 }
 
-fn main() -> InterpretResult<()> {
+fn main() {
     let args = Args::parse();
 
     match args.path {
@@ -76,6 +78,4 @@ fn main() -> InterpretResult<()> {
 
         None => repl(),
     }
-
-    Ok(())
 }
