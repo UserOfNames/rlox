@@ -11,6 +11,8 @@ use thiserror::Error;
 
 use vm::VM;
 
+const USIZE_SIZE: usize = std::mem::size_of::<usize>();
+
 #[derive(Debug, Parser)]
 #[command(name = "rlox", author = "UserOfNames", version, about)]
 struct Args {

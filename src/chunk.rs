@@ -1,5 +1,7 @@
 use std::fmt::Write;
 
+use crate::USIZE_SIZE;
+
 pub type Value = f64;
 
 #[derive(Debug)]
@@ -63,7 +65,6 @@ impl Chunk {
     /// `OpCode::Constant`. Resolves it into an offset, fetches the corresponding constant, and
     /// returns (offset, constant).
     pub fn get_constant(&self, lower: usize) -> Option<(usize, Value)> {
-        const USIZE_SIZE: usize = std::mem::size_of::<usize>();
         let upper = lower.checked_add(USIZE_SIZE)?;
 
         let bytes = self.code.get(lower..upper)?;
@@ -79,7 +80,6 @@ impl Chunk {
     pub fn push_const_opcode(&mut self, value: Value, line: LineNum) {
         let i = self.push_constant(value);
         self.push_opcode(OpCode::Constant, line);
-        const USIZE_SIZE: usize = std::mem::size_of::<usize>();
         for _ in 0..USIZE_SIZE {
             self.push_line(line)
         }

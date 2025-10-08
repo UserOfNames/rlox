@@ -1,6 +1,6 @@
 use crate::chunk::{Chunk, OpCode, Value};
 use crate::compiler::compile;
-use crate::{InterpretError, InterpretResult};
+use crate::{InterpretError, InterpretResult, USIZE_SIZE};
 
 pub struct VM {
     chunk: Chunk,
@@ -51,7 +51,7 @@ impl VM {
                         .get_constant(self.ip)
                         .ok_or(InterpretError::Runtime)?;
                     // TODO: Organize this constant
-                    self.ip += std::mem::size_of::<usize>();
+                    self.ip += USIZE_SIZE;
                     self.stack.push(constant);
                 }
 
