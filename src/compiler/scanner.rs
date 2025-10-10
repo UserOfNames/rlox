@@ -49,6 +49,7 @@ static KEYWORDS: phf::Map<&'static str, TokenKind> = phf::phf_map! {
     "var" => TokenKind::Var,
 };
 
+#[derive(Debug)]
 pub struct Scanner<'a> {
     source: &'a str,
     source_iter: Peekable<CharIndices<'a>>,
