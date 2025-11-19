@@ -11,14 +11,11 @@ pub struct Parser<'a> {
 }
 
 impl<'a> Parser<'a> {
-    pub fn new(mut scanner: Scanner<'a>) -> Self {
-        // TODO: Proper error model
-        let previous = scanner.next().unwrap().unwrap();
-        let current = scanner.next().unwrap().unwrap();
+    pub fn new(scanner: Scanner<'a>) -> Self {
         Self {
             scanner,
-            current,
-            previous,
+            current: Token::new_undefined(),
+            previous: Token::new_undefined(),
             erred: false,
             panicking: false,
         }

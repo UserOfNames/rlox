@@ -27,6 +27,9 @@ pub enum TokenKind<'a> {
     If, Else, While, For,
     Class, Super, This, Fun, Return,
     Nil, Print, Var,
+
+    // Sentinel for uninitialized tokens
+    Undefined,
 }
 
 impl Display for TokenKind<'_> {
@@ -73,6 +76,8 @@ impl Display for TokenKind<'_> {
             TokenKind::Nil => write!(f, "None"),
             TokenKind::Print => write!(f, "Print"),
             TokenKind::Var => write!(f, "Let"),
+
+            TokenKind::Undefined => write!(f, "Undefined"),
         }
     }
 }
@@ -82,6 +87,16 @@ pub struct Token<'a> {
     pub kind: TokenKind<'a>,
     pub lexeme: &'a str,
     pub line: LineNum,
+}
+
+impl Token<'_> {
+    pub fn new_undefined() -> Self {
+        Self {
+            kind: TokenKind::Undefined,
+            lexeme: "",
+            line: 0,
+        }
+    }
 }
 
 impl Display for Token<'_> {
