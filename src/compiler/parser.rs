@@ -1,5 +1,5 @@
 use super::scanner::{Scanner, ScannerError};
-use super::token::Token;
+use super::token::{Token, TokenKind};
 
 #[derive(Debug)]
 pub struct Parser<'a> {
@@ -25,16 +25,22 @@ impl<'a> Parser<'a> {
         while let Some(token_res) = self.scanner.next() {
             match token_res {
                 Ok(t) => return Some(t),
-                Err(e) => self.report_err(&e),
+                Err(e) => self.report_err(&e, "Syntax error"),
             }
         }
 
         None
     }
 
-    fn report_err(&mut self, error: &ScannerError) {
+    fn consume(&mut self, kind: &TokenKind, err_message: &str) {
+        if matches!(&self.current.kind, kind) {
+            self.advance();
+        }
+    }
+
+    fn report_err(&mut self, error: &ScannerError, message: &str) {
         self.erred = true;
         self.panicking = true;
-        eprintln!("[Line {}] Syntax error: {}\n", error.line(), error);
+        eprintln!("[Line {}] {message}: {}\n", error.line(), error);
     }
 }
